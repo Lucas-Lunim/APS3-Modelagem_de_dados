@@ -1,87 +1,39 @@
----
-config:
-  theme: default
-  sequence:
-    mirrorActors: false
-    actorMargin: 25
-    width: 135
-    messageMargin: 22
-    noteMargin: 8
----
 sequenceDiagram
-    autonumber
     actor Estudante
     participant API as MatchingAPI
-    participant Fila as FilaMatching
-    participant Exec as ExecutorMatching
-    participant Repo as RepositorioMatching
+    participant Servico as ServicoMatching
     participant Dados as RepositorioDados
     participant Politica as PoliticaMatching
 
-    Estudante->>API: solicitar(SolicitarMatchingDTO)
-    API->>Fila: publicarSolicitacao(PedidoMatchingDTO)
-    Note over Fila: RPC transacional: cria Pendente e publica a mensagem
-    Fila-->>API: SolicitacaoDTO
+    Estudante->>API: solicitar(PedidoMatchingDTO)
+    API->>Servico: criar(pedido)
+    Servico-->>API: SolicitacaoDTO
+    API-)Servico: processar(id)
     API-->>Estudante: SolicitacaoDTO / HTTP 202
 
-    Fila-)Exec: processar(MensagemMatchingDTO)
-    Note over Fila,Exec: Entrega lógica assíncrona. Consumidor Python lê a fila por polling
-    Exec->>Repo: iniciarTentativa(id, mensagemId)
-    Repo-->>Exec: TentativaDTO
-    Note over Exec,Repo: Se uma mudança de etapa for recusada, abandonar a tentativa sem confirmar a mensagem
-    alt tentativa.adquirida
-        par Consultar perfil
-            Exec->>Dados: buscarPerfil(idEstudante)
-            Dados-->>Exec: ConsultaPerfilDTO
-        and Consultar demanda
-            Exec->>Dados: buscarDemanda(idDemanda)
-            Dados-->>Exec: ConsultaDemandaDTO
-        and Consultar política versionada
-            Exec->>Dados: buscarPolitica(versaoPolitica)
-            Dados-->>Exec: ConsultaPoliticaDTO
+    par Buscar perfil
+        Servico->>Dados: buscarPerfil(perfilId)
+        Dados-->>Servico: PerfilDTO
+    and Buscar vaga
+        Servico->>Dados: buscarDemanda(demandaId)
+        Dados-->>Servico: DemandaDTO
+    end
+
+    alt dadosValidos
+        Servico->>Politica: calcular(perfil, demanda)
+        Politica-->>Servico: ResultadoMatchingDTO
+        alt resultado.sucesso
+            Servico->>Dados: salvarResultado(id, resultado)
+            Dados-->>Servico: GravacaoDTO
+            Note over Servico: Concluida se gravacao.sucesso. Caso contrário, Falha.
+        else falha no cálculo
+            Note over Servico: Registrar estado Falha e motivo
         end
-
-        alt algumaConsulta.falhaTecnica
-            Exec->>Repo: registrarFalha(id, token, motivo)
-            Repo-->>Exec: PersistenciaDTO
-        else consultas sem falha técnica
-            Exec->>Repo: registrarEtapa(id, token, ValidandoDados)
-            Repo-->>Exec: PersistenciaDTO
-            Exec->>Exec: validarEntradas(perfil, demanda, politica)
-            Exec-->>Exec: ValidacaoDTO
-            alt validacao.valida
-                Exec->>Repo: registrarEtapa(id, token, Calculando)
-                Repo-->>Exec: PersistenciaDTO
-                Exec->>Politica: calcular(perfil.perfil, demanda.demanda, politica.configuracao)
-                Politica-->>Exec: ResultadoMatchingDTO
-                alt resultado.ok
-                    Exec->>Repo: concluir(id, token, resultado)
-                    Repo-->>Exec: PersistenciaDTO
-                else falha no cálculo
-                    Exec->>Repo: registrarFalha(id, token, motivo)
-                    Repo-->>Exec: PersistenciaDTO
-                end
-            else entradas ou política inválidas
-                Exec->>Repo: rejeitar(id, token, motivos)
-                Repo-->>Exec: PersistenciaDTO
-            end
-        end
-    else tentativa não adquirida
-        Note over Exec,Repo: Duplicata terminal ou tentativa com concessão vigente: não recalcular
+    else dados inválidos
+        Note over Servico: Registrar estado Rejeitada e motivo
     end
 
-    Exec->>Repo: consultar(id)
-    Repo-->>Exec: ConsultaMatchingDTO
-    alt consulta.estadoTerminal
-        Exec->>Fila: confirmar(mensagemId)
-        Fila-->>Exec: ConfirmacaoDTO
-    else solicitação ainda não terminal
-        Note over Exec,Fila: Não confirmar. Mensagem pode reaparecer após o prazo de visibilidade
-    end
-
-    loop Consultas com intervalo até estado terminal
-        Estudante->>API: consultar(id)
-        API->>Repo: consultar(id)
-        Repo-->>API: ConsultaMatchingDTO
-        API-->>Estudante: ConsultaMatchingDTO / HTTP 200
-    end
+    Estudante->>API: consultar(id)
+    API->>Servico: consultar(id)
+    Servico-->>API: ConsultaMatchingDTO
+    API-->>Estudante: ConsultaMatchingDTO
