@@ -23,7 +23,7 @@ def main():
     adr = (ROOT / "docs/architecture/adr-0001.md").read_text(encoding="utf-8").strip()
     adr = "\n".join("#" + linha if linha.startswith("#") else linha for linha in adr.splitlines())
     partes.append(adr)
-    (ROOT / "README.md").write_text("\n\n".join(partes) + "\n", encoding="utf-8")
+    (ROOT / "README.md").write_text("\n\n".join(partes) + "\n", encoding="utf-8", newline="\n")
     print("README atualizado com cinco diagramas e ADR.")
 if __name__ == "__main__":
     main()

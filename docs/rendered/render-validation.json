@@ -1,0 +1,40 @@
+{
+  "renderer": "Mermaid 10.9.3",
+  "results": [
+    {
+      "file": "docs/diagrams/sequencia.mmd",
+      "valid": true,
+      "width": 1881,
+      "height": 2688,
+      "source_sha256": "a63011ac2a52ecd0475e9e493b52a666894a5fda9052c152935ba65d35e78551"
+    },
+    {
+      "file": "docs/diagrams/atividades.mmd",
+      "valid": true,
+      "width": 3053,
+      "height": 2955,
+      "source_sha256": "e1a45a15f63dc775dbce55a6e651a9fe277029f9124ce0b5a1c0d676c8df39fd"
+    },
+    {
+      "file": "docs/diagrams/estados.mmd",
+      "valid": true,
+      "width": 792,
+      "height": 1224,
+      "source_sha256": "7b5c5157151d878be1f456d4a3c5d612ca512161b0eef9bed80faefc8c893c39"
+    },
+    {
+      "file": "docs/architecture/componentes.mmd",
+      "valid": true,
+      "width": 1735,
+      "height": 830,
+      "source_sha256": "15a53e1e9c9824bbc75d5a19a56e67bec09c6bce67bb40fce0932e98556b16e9"
+    },
+    {
+      "file": "docs/diagrams/interfaces.mmd",
+      "valid": true,
+      "width": 3115,
+      "height": 551,
+      "source_sha256": "6d0b6bc649f49a5a603895d04d814152f65c3ca1b52991723210677e7f4103fb"
+    }
+  ]
+}
