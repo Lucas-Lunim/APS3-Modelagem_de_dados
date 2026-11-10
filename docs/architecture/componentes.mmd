@@ -1,0 +1,42 @@
+---
+config:
+  theme: default
+  flowchart:
+    nodeSpacing: 55
+    rankSpacing: 65
+    curve: stepAfter
+---
+flowchart TB
+    API["<b>API UniSenai</b><br/>[Contêiner: Python / HTTPS]<br/>MatchingAPI recebe pedidos e consulta estados"]
+
+    subgraph WORKER["Worker de Matching - Contêiner Python detalhado / C4 nível 3"]
+        direction TB
+        CONSUMIDOR["<b>Consumidor da Fila</b><br/>[Componente: Python / supabase-py]<br/>Faz polling e entrega comandos"]
+        EXEC["<b>ExecutorMatching</b><br/>[Componente: Python]<br/>Orquestra tentativas e leituras paralelas"]
+        POLITICA["<b>PoliticaMatching</b><br/>[Componente: Python]<br/>Calcula compatibilidade conforme a versão da política"]
+        DADOS["<b>RepositorioDados</b><br/>[Componente: Python / supabase-py]<br/>Lê perfis, demandas e políticas"]
+        REPO["<b>RepositorioMatching</b><br/>[Componente: Python / supabase-py]<br/>Controla estados, tentativas e resultados"]
+        CONSUMIDOR -->|"processar - despacho local<br/>Chamada Python"| EXEC
+        EXEC -->|"calcular<br/>Chamada Python"| POLITICA
+        EXEC -->|"Consultar entradas em paralelo<br/>Chamadas Python concorrentes"| DADOS
+        EXEC -->|"Adquirir concessão e persistir transições<br/>Chamada Python"| REPO
+    end
+
+    FILA["<b>FilaMatching - Supabase Queues</b><br/>[Fila: PostgreSQL / pgmq]<br/>Comandos duráveis; adaptador RPC FilaMatching"]
+    DATAAPI["<b>Supabase Data API</b><br/>[Contêiner: PostgREST]<br/>REST e funções RPC restritas ao backend"]
+    BANCO["<b>Dados de Matching</b><br/>[Contêiner: PostgreSQL / Supabase]<br/>Perfis, demandas, políticas, solicitações e resultados"]
+
+    API -->|"Publicar pedido atomicamente<br/>RPC / HTTPS / JSON"| FILA
+    CONSUMIDOR -->|"Ler e confirmar mensagens<br/>pgmq_public via RPC / HTTPS / JSON"| FILA
+    API -->|"Consultar solicitação<br/>REST / HTTPS / JSON"| DATAAPI
+    DADOS -->|"Consultar dados<br/>REST / HTTPS / JSON"| DATAAPI
+    REPO -->|"Transições condicionais<br/>RPC / HTTPS / JSON"| DATAAPI
+    DATAAPI -->|"Consultas e transações<br/>Protocolo PostgreSQL"| BANCO
+
+    classDef app fill:#DCEBFA,stroke:#356591,color:#153550,stroke-width:1.5px;
+    classDef foco fill:#145D82,stroke:#0C3F5B,color:#FFFFFF,stroke-width:2px;
+    classDef dados fill:#E1F3EB,stroke:#4D8E75,color:#193D2E,stroke-width:1.5px;
+    class API,CONSUMIDOR,EXEC,DADOS,REPO app;
+    class POLITICA foco;
+    class FILA,DATAAPI,BANCO dados;
+    style WORKER fill:#F7FAFD,stroke:#829CB4,stroke-width:2px

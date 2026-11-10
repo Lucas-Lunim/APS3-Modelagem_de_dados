@@ -1,0 +1,86 @@
+---
+config:
+  theme: default
+  flowchart:
+    nodeSpacing: 32
+    rankSpacing: 42
+    curve: stepAfter
+---
+flowchart TB
+    subgraph USUARIO["Raia 1 - Estudante"]
+        INICIO(( ))
+        SOLICITAR("Solicitar análise do perfil para uma vaga")
+        CONSULTAR("Consultar estado e resultado pelo identificador")
+        FIM((("●")))
+    end
+    subgraph API["Raia 2 - MatchingAPI / Python"]
+        PEDIDO("Montar PedidoMatchingDTO com identidade autorizada")
+        RECIBO("Retornar SolicitacaoDTO - HTTP 202")
+        RESPOSTA("Retornar ConsultaMatchingDTO")
+        TERMINAL{"Estado terminal?"}
+    end
+    subgraph SUPABASE["Raia 3 - Supabase / PostgreSQL e pgmq"]
+        PUBLICAR("Criar solicitação Pendente e enfileirar<br/>na mesma transação")
+        MENSAGEM>"MensagemMatchingDTO"]
+        PERFIL("Ler perfil e sua versão")
+        DEMANDA("Ler demanda, publicação e convênio")
+        CONFIG("Ler versão imutável da política")
+        FINALIZAR("Persistir estado terminal por operação atômica<br/>com token da tentativa")
+        ACK("Arquivar mensagem após confirmar estado terminal")
+        LER("Ler estado persistido e dados do resultado")
+    end
+    subgraph WORKER["Raia 4 - Worker de Matching / Python"]
+        RECEBER("Consumir mensagem por polling")
+        ADQUIRIR("Tentar adquirir concessão exclusiva")
+        ADQUIRIDA{"Tentativa adquirida?"}
+        DUPLICATA("Manter solicitação sem alteração")
+        CHECAR{"Estado persistido terminal?"}
+        AGUARDAR("Aguardar expiração da visibilidade<br/>e tentar nova entrega")
+        FORK["<span style='display:block;width:180px;height:1px'></span>"]
+        JOIN["<span style='display:block;width:180px;height:1px'></span>"]
+        TECNICA{"Alguma consulta falhou tecnicamente?"}
+        VALIDAR("Validar perfil, demanda, convênio<br/>e configuração da política")
+        VALIDA{"Entradas válidas?"}
+        CALCULAR("PoliticaMatching.calcular<br/>retorna ResultadoMatchingDTO")
+        CALCULO_OK{"Cálculo bem-sucedido?"}
+        CONCLUIR("Preparar Concluida com nota e versões")
+        REJEITAR("Preparar Rejeitada com motivos")
+        FALHAR("Preparar FalhaTecnica com motivo")
+    end
+
+    INICIO --> SOLICITAR --> PEDIDO --> PUBLICAR --> RECIBO
+    PUBLICAR -. "entrega assíncrona" .-> MENSAGEM --> RECEBER --> ADQUIRIR --> ADQUIRIDA
+    ADQUIRIDA -- "[tentativa.adquirida]" --> FORK
+    ADQUIRIDA -- "[!tentativa.adquirida]" --> DUPLICATA --> CHECAR
+    CHECAR -- "[estadoTerminal]" --> ACK
+    CHECAR -- "[!estadoTerminal]" --> AGUARDAR --> RECEBER
+    FORK --> PERFIL --> JOIN
+    FORK --> DEMANDA --> JOIN
+    FORK --> CONFIG --> JOIN
+    JOIN --> TECNICA
+    TECNICA -- "[algumaConsulta.falhaTecnica]" --> FALHAR
+    TECNICA -- "[!algumaConsulta.falhaTecnica]" --> VALIDAR --> VALIDA
+    VALIDA -- "[validacao.valida]" --> CALCULAR --> CALCULO_OK
+    VALIDA -- "[!validacao.valida]" --> REJEITAR
+    CALCULO_OK -- "[resultado.ok]" --> CONCLUIR
+    CALCULO_OK -- "[!resultado.ok]" --> FALHAR
+    CONCLUIR --> FINALIZAR
+    REJEITAR --> FINALIZAR
+    FALHAR --> FINALIZAR
+    FINALIZAR --> CHECAR
+    RECIBO --> CONSULTAR --> LER --> RESPOSTA --> TERMINAL
+    TERMINAL -- "[consulta.estadoTerminal]" --> FIM
+    TERMINAL -- "[!consulta.estadoTerminal]" --> CONSULTAR
+
+    classDef barra fill:#18354F,stroke:#18354F,color:#18354F,stroke-width:3px;
+    classDef inicio fill:#18354F,stroke:#18354F,color:#18354F;
+    classDef fim fill:#FFFFFF,stroke:#18354F,color:#18354F,stroke-width:2px;
+    classDef decisao fill:#FFF3D6,stroke:#A07820,color:#182A3A;
+    class FORK,JOIN barra;
+    class INICIO inicio;
+    class FIM fim;
+    class TERMINAL,ADQUIRIDA,CHECAR,TECNICA,VALIDA,CALCULO_OK decisao;
+    style USUARIO fill:#F5F7FB,stroke:#8C9CB0
+    style API fill:#EDF4FD,stroke:#5A86B5
+    style SUPABASE fill:#ECF8F3,stroke:#4C927B
+    style WORKER fill:#F1F5FB,stroke:#5B7CA4

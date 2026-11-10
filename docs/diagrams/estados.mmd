@@ -1,0 +1,41 @@
+---
+config:
+  theme: default
+---
+stateDiagram-v2
+    direction TB
+    state "Pendente" as Pendente
+    state "Processando" as Processando {
+        state "CarregandoDados" as CarregandoDados
+        state "ValidandoDados" as ValidandoDados
+        state "Calculando" as Calculando
+        [*] --> CarregandoDados
+        CarregandoDados : entry / carregarDadosEmParalelo()
+        CarregandoDados : do / aguardarAsTresConsultas()
+        ValidandoDados : entry / validarEntradas()
+        Calculando : do / calcularCompatibilidade()
+        CarregandoDados --> ValidandoDados : consultasConcluidas<br/>[todasSemFalhaTecnica && tokenVigente]<br/>/ registrarEtapa()
+        CarregandoDados --> [*] : consultaFalhou<br/>[tokenVigente]<br/>/ prepararFalha()
+        ValidandoDados --> Calculando : entradasValidadas<br/>[validacao.valida && tokenVigente]<br/>/ registrarEtapa()
+        ValidandoDados --> [*] : entradasValidadas<br/>[!validacao.valida && tokenVigente]<br/>/ prepararRejeicao()
+        Calculando --> [*] : calculoEncerrado<br/>[tokenVigente]<br/>/ prepararDesfecho()
+    }
+    state Desfecho <<choice>>
+    state "Concluida" as Concluida
+    state "Rejeitada" as Rejeitada
+    state "FalhaTecnica" as FalhaTecnica
+
+    [*] --> Pendente
+    Pendente : entry / registrarRecebimento()
+    Pendente --> Processando : consumirMensagem<br/>[concessaoAdquirida]<br/>/ iniciarTentativa()
+    Processando --> Pendente : concessaoExpirou<br/>[!estadoTerminal && prazoExpirou]<br/>/ invalidarTentativa()
+    Processando --> Desfecho : tentativaEncerrada<br/>[tokenVigente]<br/>/ persistirDesfecho()
+    Desfecho --> Concluida : [desfecho == CONCLUIDA]
+    Desfecho --> Rejeitada : [desfecho == REJEITADA]
+    Desfecho --> FalhaTecnica : [desfecho == FALHA_TECNICA]
+    Concluida : entry / disponibilizarResultado()
+    Rejeitada : entry / disponibilizarMotivos()
+    FalhaTecnica : entry / disponibilizarErro()
+    Concluida --> [*]
+    Rejeitada --> [*]
+    FalhaTecnica --> [*]

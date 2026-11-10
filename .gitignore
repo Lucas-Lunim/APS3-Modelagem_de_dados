@@ -1,0 +1,5 @@
+docs/rendered/*-preview.png
+__pycache__/
+*.pyc
+.env
+.env.*
