@@ -4,18 +4,18 @@ stateDiagram-v2
         state "BuscandoDados" as BuscandoDados
         state "Calculando" as Calculando
         [*] --> BuscandoDados
-        BuscandoDados : do / buscarPerfilEVagaEmParalelo()
-        BuscandoDados --> Calculando : dadosCarregados<br/>[dadosValidos]<br/>/ validarDados()
-        Calculando : do / calcularCompatibilidade()
+        BuscandoDados : do / buscarDadosEValidar()
+        BuscandoDados --> Calculando : dadosCarregados<br/>[dadosValidos]<br/>/ iniciarCalculo()
+        Calculando : do / calcularESalvarResultado()
     }
     state "Concluida" as Concluida
     state "Rejeitada" as Rejeitada
     state "Falha" as Falha
     [*] --> Recebida
     Recebida --> EmAnalise : iniciarProcessamento<br/>[estado == Recebida]<br/>/ iniciarTarefa()
-    EmAnalise --> Concluida : resultadoGravado<br/>[resultado.sucesso && gravacao.sucesso]<br/>/ registrarResultado()
-    EmAnalise --> Rejeitada : dadosCarregados<br/>[!dadosValidos]<br/>/ registrarMotivo()
-    EmAnalise --> Falha : erroTecnico<br/>[houveFalha]<br/>/ registrarErro()
+    Calculando --> Concluida : resultadoGravado<br/>[resultado.sucesso && gravacao.sucesso]<br/>/ registrarResultado()
+    BuscandoDados --> Rejeitada : dadosCarregados<br/>[!dadosValidos]<br/>/ registrarMotivo()
+    EmAnalise --> Falha : processamentoFalhou<br/>[houveFalha]<br/>/ registrarErro()
     Concluida --> [*]
     Rejeitada --> [*]
     Falha --> [*]

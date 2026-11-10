@@ -11,7 +11,7 @@ A aplicação Python recebe o pedido, inicia uma tarefa assíncrona e permite co
 
 `dadosValidos = perfil.encontrado && demanda.encontrada && demanda.publicada && demanda.convenioValido`
 
-O serviço inicia o processamento somente no estado Recebida. Cada solicitação possui uma única tarefa; os estados Concluida, Rejeitada e Falha não aceitam novas alterações. Erros técnicos são capturados pela tarefa e levam ao estado Falha.
+O serviço inicia o processamento somente no estado Recebida. Cada solicitação possui uma única tarefa; os estados Concluida, Rejeitada e Falha não aceitam novas alterações. Erros técnicos são capturados pela tarefa e levam ao estado Falha. Falhas reportadas pelo cálculo ou pela gravação também levam a Falha.
 
 Os critérios de comparação e seus pesos ainda serão definidos pela equipe. Os diagramas representam o fluxo do cálculo, sem atribuir pesos ou uma fórmula como regra aprovada.
 
@@ -121,7 +121,9 @@ flowchart TB
         SALVOU{"Resultado salvo?"}
         CONCLUIR("Marcar Concluida")
         REJEITAR("Marcar Rejeitada e motivo")
+        MERGE_FALHA{" "}
         FALHAR("Marcar Falha e motivo")
+        MERGE_FINAL{" "}
         DISPONIVEL("Disponibilizar estado e resultado")
     end
     subgraph BANCO["Raia 3 - Supabase"]
@@ -134,11 +136,13 @@ flowchart TB
     FORK --> VAGA --> JOIN
     JOIN --> VALIDAR
     VALIDAR -- "[dadosValidos]" --> CALCULAR --> OK
-    VALIDAR -- "[!dadosValidos]" --> REJEITAR --> DISPONIVEL
+    VALIDAR -- "[!dadosValidos]" --> REJEITAR --> MERGE_FINAL
     OK -- "[resultado.sucesso]" --> SALVAR --> SALVOU
-    OK -- "[!resultado.sucesso]" --> FALHAR
-    SALVOU -- "[gravacao.sucesso]" --> CONCLUIR --> DISPONIVEL
-    SALVOU -- "[!gravacao.sucesso]" --> FALHAR --> DISPONIVEL
+    OK -- "[!resultado.sucesso]" --> MERGE_FALHA
+    SALVOU -- "[gravacao.sucesso]" --> CONCLUIR --> MERGE_FINAL
+    SALVOU -- "[!gravacao.sucesso]" --> MERGE_FALHA
+    MERGE_FALHA --> FALHAR --> MERGE_FINAL
+    MERGE_FINAL --> DISPONIVEL
     DISPONIVEL --> VER --> F
 
     classDef barra fill:#243B53,stroke:#243B53,color:#243B53;
@@ -157,18 +161,18 @@ stateDiagram-v2
         state "BuscandoDados" as BuscandoDados
         state "Calculando" as Calculando
         [*] --> BuscandoDados
-        BuscandoDados : do / buscarPerfilEVagaEmParalelo()
-        BuscandoDados --> Calculando : dadosCarregados<br/>[dadosValidos]<br/>/ validarDados()
-        Calculando : do / calcularCompatibilidade()
+        BuscandoDados : do / buscarDadosEValidar()
+        BuscandoDados --> Calculando : dadosCarregados<br/>[dadosValidos]<br/>/ iniciarCalculo()
+        Calculando : do / calcularESalvarResultado()
     }
     state "Concluida" as Concluida
     state "Rejeitada" as Rejeitada
     state "Falha" as Falha
     [*] --> Recebida
     Recebida --> EmAnalise : iniciarProcessamento<br/>[estado == Recebida]<br/>/ iniciarTarefa()
-    EmAnalise --> Concluida : resultadoGravado<br/>[resultado.sucesso && gravacao.sucesso]<br/>/ registrarResultado()
-    EmAnalise --> Rejeitada : dadosCarregados<br/>[!dadosValidos]<br/>/ registrarMotivo()
-    EmAnalise --> Falha : erroTecnico<br/>[houveFalha]<br/>/ registrarErro()
+    Calculando --> Concluida : resultadoGravado<br/>[resultado.sucesso && gravacao.sucesso]<br/>/ registrarResultado()
+    BuscandoDados --> Rejeitada : dadosCarregados<br/>[!dadosValidos]<br/>/ registrarMotivo()
+    EmAnalise --> Falha : processamentoFalhou<br/>[houveFalha]<br/>/ registrarErro()
     Concluida --> [*]
     Rejeitada --> [*]
     Falha --> [*]

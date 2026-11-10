@@ -16,7 +16,9 @@ flowchart TB
         SALVOU{"Resultado salvo?"}
         CONCLUIR("Marcar Concluida")
         REJEITAR("Marcar Rejeitada e motivo")
+        MERGE_FALHA{" "}
         FALHAR("Marcar Falha e motivo")
+        MERGE_FINAL{" "}
         DISPONIVEL("Disponibilizar estado e resultado")
     end
     subgraph BANCO["Raia 3 - Supabase"]
@@ -29,11 +31,13 @@ flowchart TB
     FORK --> VAGA --> JOIN
     JOIN --> VALIDAR
     VALIDAR -- "[dadosValidos]" --> CALCULAR --> OK
-    VALIDAR -- "[!dadosValidos]" --> REJEITAR --> DISPONIVEL
+    VALIDAR -- "[!dadosValidos]" --> REJEITAR --> MERGE_FINAL
     OK -- "[resultado.sucesso]" --> SALVAR --> SALVOU
-    OK -- "[!resultado.sucesso]" --> FALHAR
-    SALVOU -- "[gravacao.sucesso]" --> CONCLUIR --> DISPONIVEL
-    SALVOU -- "[!gravacao.sucesso]" --> FALHAR --> DISPONIVEL
+    OK -- "[!resultado.sucesso]" --> MERGE_FALHA
+    SALVOU -- "[gravacao.sucesso]" --> CONCLUIR --> MERGE_FINAL
+    SALVOU -- "[!gravacao.sucesso]" --> MERGE_FALHA
+    MERGE_FALHA --> FALHAR --> MERGE_FINAL
+    MERGE_FINAL --> DISPONIVEL
     DISPONIVEL --> VER --> F
 
     classDef barra fill:#243B53,stroke:#243B53,color:#243B53;
